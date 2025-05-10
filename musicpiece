@@ -1,0 +1,84 @@
+import logging
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
+from pytube import YouTube
+import os
+import asyncio
+
+# Global variables for music control
+current_song = None
+player = None
+is_playing = False
+
+TOKEN = "8112824574:AAElLzgFpKlc0HHJzkFLM7Oa8dzhKvyl0c8"
+
+# Music player functions
+async def download_song(url):
+    yt = YouTube(url)
+    audio = yt.streams.filter(only_audio=True).first()
+    return audio.download(filename="current_song.mp3")
+
+async def play_music(update: Update):
+    global is_playing
+    is_playing = True
+    await update.message.reply_audio(audio=open("current_song.mp3", "rb"))
+    is_playing = False
+    os.remove("current_song.mp3")
+
+# Command handlers
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🎵 Music Bot Ready! Use /play [YouTube URL]")
+
+async def play(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global current_song
+    url = context.args[0] if context.args else None
+    
+    if not url:
+        await update.message.reply_text("Please provide a YouTube URL after /play")
+        return
+    
+    try:
+        await update.message.reply_text("⬇️ Downloading...")
+        current_song = await download_song(url)
+        await play_music(update)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+async def pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global is_playing
+    if is_playing:
+        is_playing = False
+        await update.message.reply_text("⏸️ Music paused")
+    else:
+        await update.message.reply_text("No music is currently playing")
+
+async def resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global is_playing
+    if not is_playing and current_song:
+        is_playing = True
+        await play_music(update)
+    else:
+        await update.message.reply_text("Nothing to resume")
+
+async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global is_playing
+    is_playing = False
+    await update.message.reply_text("⏭️ Song skipped")
+    # Add logic to play next song if you have a queue
+
+def main():
+    app = Application.builder().token(TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("play", play))
+    app.add_handler(CommandHandler("pause", pause))
+    app.add_handler(CommandHandler("resume", resume))
+    app.add_handler(CommandHandler("skip", skip))
+    
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
+python-telegram-bot
+pytube
+ffmpeg-python
